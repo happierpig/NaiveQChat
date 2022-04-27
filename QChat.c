@@ -197,6 +197,49 @@ static int qchat_read(const char *path, char *buf, size_t size, off_t offset,
 	return size;
 }
 
+static int qchat_write(const char *path, const char *buf, size_t size,
+		     off_t offset, struct fuse_file_info *fi){
+    (void) fi;
+    
+    struct qNode * target;
+    int res = find_node(&target, root, path); // ENOTSUP
+    if(res != 0) return res;
+
+    char * raw = target->content;
+    int finalSize = (offset + size > strlen(raw)) ? (offset + size) : strlen(raw);
+    char * newData = (char *) malloc(finalSize+1);
+    memcpy(newData, raw, strlen(raw));
+    memcpy(newData + offset, buf, size);
+    newData[finalSize] = '\0';
+    free(raw);
+    target->content = newData;
+
+    // try to write to symmetry entry
+    int slashCount = 0;
+    int stringPtr = 0;
+    int slashPtr = 0;
+    while(path[stringPtr] != '\0'){
+        if(path[stringPtr] == '/'){
+            slashCount++;
+            if(slashCount == 2) slashPtr = stringPtr;
+        }
+        stringPtr++;
+    }
+    if(slashCount != 2) return size;
+    
+    char symmetryPath[stringPtr+2];
+    memcpy(symmetryPath,path+slashPtr,stringPtr-slashPtr);
+    memcpy(symmetryPath+stringPtr-slashPtr,path,slashPtr);
+    symmetryPath[stringPtr] = '\0';
+
+    res = find_node(&target, root, symmetryPath);
+    if(res != 0) return size;
+    free(target->content);
+    target->content = strdup(newData);
+
+    return size;
+}
+
 static int qchat_mkdir(const char *path, mode_t mode)
 {
 	int res;
@@ -204,7 +247,7 @@ static int qchat_mkdir(const char *path, mode_t mode)
     int ptr = length - 1;
     while(path[ptr] != '/') ptr--;
 
-    char newPath[length];
+    char newPath[length+1];
     int tmpCount = 0;
     while(tmpCount <= ptr){
         newPath[tmpCount] = path[tmpCount];
@@ -244,6 +287,11 @@ static int qchat_release(const char *path, struct fuse_file_info *fi){
     return 0;
 }
 
+static int qchat_utimens(const char * path, const struct timespec tv[2],
+			 struct fuse_file_info *fi){
+    return 0;
+}
+
 static const struct fuse_operations qchat_oper = {
     .init       =   qchat_init,
     .getattr    =   qchat_getattr,
@@ -253,6 +301,8 @@ static const struct fuse_operations qchat_oper = {
     .mkdir      =   qchat_mkdir,
     .mknod      =   qchat_mknod,
     .release    =   qchat_release,
+    .write      =   qchat_write,
+    .utimens    =   qchat_utimens,
 };
 
 static void show_help(const char *progname)
