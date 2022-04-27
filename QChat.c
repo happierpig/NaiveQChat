@@ -132,6 +132,7 @@ static int qchat_getattr(const char *path, struct stat *stbuf,
 {
 	(void) fi;
 	memset(stbuf, 0, sizeof(struct stat));
+
     struct qNode * target;
     int res = find_node(&target, root, path);
     if(res != 0) return res;
@@ -221,9 +222,26 @@ static int qchat_mkdir(const char *path, mode_t mode)
     while(path[ptr] != '\0') newPath[tmpCount++] = path[ptr++];
     newPath[tmpCount] = '\0';
     set_node(new, strdup(newPath), NULL, 0, NULL, NULL, NULL);
-
     add_node(target, new);
 	return 0;
+}
+
+static int qchat_mknod(const char * path, mode_t mode, dev_t di){
+    (void) di;
+    (void) mode;
+    int res = qchat_mkdir(path, mode);
+    if(res != 0) return res;
+    
+    struct qNode * target;
+    res = find_node(&target, root,path);
+    if(res != 0) return -EPIPE;
+    target->specie = 1;
+    target->content = strdup("Hello world!\n");
+    return 0;
+}
+
+static int qchat_release(const char *path, struct fuse_file_info *fi){
+    return 0;
 }
 
 static const struct fuse_operations qchat_oper = {
@@ -233,6 +251,8 @@ static const struct fuse_operations qchat_oper = {
     .open       =   qchat_open,
     .read       =   qchat_read,
     .mkdir      =   qchat_mkdir,
+    .mknod      =   qchat_mknod,
+    .release    =   qchat_release,
 };
 
 static void show_help(const char *progname)
