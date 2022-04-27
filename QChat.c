@@ -10,6 +10,10 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#ifdef debug
+    char * debugLog;
+#endif
+
 static const int maxNameLength = 10;
 
 static struct qNode{
@@ -123,7 +127,7 @@ static void *qchat_init(struct fuse_conn_info *conn,
 			struct fuse_config *cfg)
 {
 	(void) conn;
-	cfg->kernel_cache = 1;
+	cfg->kernel_cache = 0;
 	return NULL;
 }
 
@@ -232,10 +236,21 @@ static int qchat_write(const char *path, const char *buf, size_t size,
     memcpy(symmetryPath+stringPtr-slashPtr,path,slashPtr);
     symmetryPath[stringPtr] = '\0';
 
+    #ifdef debug
+        strcat(debugLog,"\n-----\n");
+        strcat(debugLog,strdup(symmetryPath));
+    #endif
+
     res = find_node(&target, root, symmetryPath);
     if(res != 0) return size;
     free(target->content);
     target->content = strdup(newData);
+
+    #ifdef debug
+        strcat(debugLog," Successfully add ");
+        strcat(debugLog, newData);
+        strcat(debugLog,"\n-----\n");
+    #endif
 
     return size;
 }
@@ -337,8 +352,9 @@ int main(int argc, char *argv[])
     set_node(root,NULL,NULL,0,NULL,NULL,NULL);
 
     #ifdef debug
+    debugLog = (char*)malloc(1500);
     struct qNode * tmp = malloc_node();
-    set_node(tmp,strdup("srb"),strdup("ZhaoYiLong is srb's father."),1,NULL,NULL,NULL);
+    set_node(tmp,strdup("log"),debugLog,1,NULL,NULL,NULL);
     root->list_ptr = tmp;
     #endif
 
