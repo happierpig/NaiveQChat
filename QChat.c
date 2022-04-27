@@ -21,6 +21,7 @@ static struct qNode{
     char * content;
     int specie;                 // 0 for directory entry ; 1 for normal file
     struct qNode * list_ptr;    // record subfiles
+    struct qNode * father;
     struct qNode * next;        // for linkedlist
     struct qNode * prev;
 };
@@ -37,11 +38,11 @@ static struct qNode* malloc_node(){
 }
 
 static void set_node(struct qNode * node, char * _name, char * _content, int _specie, 
-                struct qNode * p1, struct qNode * p2, struct qNode * p3){
+                struct qNode * p1, struct qNode * p2, struct qNode * p3, struct qNode * p4){
     node->name = _name;
     node->content = _content;
     node->specie = _specie;
-    node->list_ptr = p1; node->next = p2; node->prev = p3;
+    node->list_ptr = p1; node->next = p2; node->prev = p3; node->father = p4;
 }
 
 /*
@@ -102,6 +103,20 @@ static void add_node(struct qNode * origin, struct qNode * new){
         origin->list_ptr->prev = new;
     }
     origin->list_ptr = new;
+}
+
+/*
+    Remove a node in the list ,corresponding to father
+*/
+static void remove_node(struct qNode * target){
+    struct qNode * father = target->father;
+    if(father->list_ptr == target){
+        assert(target->prev == NULL);
+        father->list_ptr = target->next;
+    }
+    if(target->next != NULL) target->next->prev = target->prev;
+    if(target->prev != NULL) target->prev->next = target->next;
+    free_node(target);
 }
 
 /*
@@ -239,6 +254,7 @@ static int qchat_write(const char *path, const char *buf, size_t size,
     #ifdef debug
         strcat(debugLog,"\n-----\n");
         strcat(debugLog,strdup(symmetryPath));
+        strcat(debugLog,"\n");
     #endif
 
     res = find_node(&target, root, symmetryPath);
@@ -279,7 +295,7 @@ static int qchat_mkdir(const char *path, mode_t mode)
     ptr++;
     while(path[ptr] != '\0') newPath[tmpCount++] = path[ptr++];
     newPath[tmpCount] = '\0';
-    set_node(new, strdup(newPath), NULL, 0, NULL, NULL, NULL);
+    set_node(new, strdup(newPath), NULL, 0, NULL, NULL, NULL, target);
     add_node(target, new);
 	return 0;
 }
@@ -295,6 +311,22 @@ static int qchat_mknod(const char * path, mode_t mode, dev_t di){
     if(res != 0) return -EPIPE;
     target->specie = 1;
     target->content = strdup("Hello world!\n");
+    return 0;
+}
+
+static int qchat_unlink(const char * path){
+    struct qNode * target;
+    int res = find_node(&target, root, path);
+    if(res != 0) return res;
+    remove_node(target);
+    return 0;
+}
+
+static int qchat_rmdir(const char * path){
+    struct qNode * target;
+    int res = find_node(&target, root, path);
+    if(res != 0) return res;
+    remove_node(target);
     return 0;
 }
 
@@ -318,6 +350,8 @@ static const struct fuse_operations qchat_oper = {
     .release    =   qchat_release,
     .write      =   qchat_write,
     .utimens    =   qchat_utimens,
+    .unlink     =   qchat_unlink,
+    .rmdir      =   qchat_rmdir,
 };
 
 static void show_help(const char *progname)
@@ -349,12 +383,12 @@ int main(int argc, char *argv[])
 	}
 
     root = malloc_node();
-    set_node(root,NULL,NULL,0,NULL,NULL,NULL);
+    set_node(root,NULL,NULL,0,NULL,NULL,NULL,NULL);
 
     #ifdef debug
     debugLog = (char*)malloc(1500);
     struct qNode * tmp = malloc_node();
-    set_node(tmp,strdup("log"),debugLog,1,NULL,NULL,NULL);
+    set_node(tmp,strdup("log"),debugLog,1,NULL,NULL,NULL,root);
     root->list_ptr = tmp;
     #endif
 
