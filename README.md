@@ -1,15 +1,20 @@
-# Q Baby
+# QChat
 
-> FUSE : Filesystem in Userspace
+> CS2952-1 OS Class DIY Homework
 
-## struct fuse_operations
+A tiny communication toy based on *FUSE* (Filesystem in Userspace), offering information exchange like:  Under the mounted root directory, `echo "Hello world" > /bot1/bot2`, we will see *Hello world!* both on `/bot1/bot2` and `/bot2/bot1`.
 
-- 结构体成员是一堆函数指针，定义了钩子函数--即内核*VFS*通过调用这些函数实现的用户态的文件系统
-- 所有函数的实现都是可选的，实现特定功能想要的组合函数即可。
-- *permisson check*
+### Usage
 
+> Though it is useless, it has usage.
 
+- 安装[FUSE](https://github.com/libfuse/libfuse)
+- `gcc -Wall QChat.c pkg-config fuse3 --cflags --libs -o hello` 编译
 
-- [st_mode](https://www.runoob.com/linux/linux-file-attr-permission.html)
+### Reference
 
- 
+- 关于文件权限 [st_mode](https://www.runoob.com/linux/linux-file-attr-permission.html)
+
+- 关于*FUSE*操作接口的一些解释 [Click here](https://blog.csdn.net/stayneckwind2/article/details/82876330)
+
+- 关于lib红黑树的使用和内核宏`container_of` [Click here](https://blog.csdn.net/stayneckwind2/article/details/82867062).
