@@ -69,7 +69,10 @@ static int find_node(struct qNode** result, const struct qNode* _root, const cha
             tmpName[tmp++] = path[stringPtr++];
         }
         tmpName[tmp] = '\0';
-        if(path[stringPtr] == '/') isDir = 1;
+        if(path[stringPtr] == '/'){
+            stringPtr++;
+            isDir = 1;
+        }
         struct qNode * nodePtr = _root->list_ptr;
         while(nodePtr != NULL){
             if(strcmp(nodePtr->name,tmpName) == 0){
@@ -84,6 +87,17 @@ static int find_node(struct qNode** result, const struct qNode* _root, const cha
     }
     (*result) = _root;
     return 0;
+}
+
+/*
+    Add new node in the subfiles.
+*/
+static void add_node(struct qNode * origin, struct qNode * new){
+    new->next = origin->list_ptr;
+    if(origin->list_ptr != NULL){
+        origin->list_ptr->prev = new;
+    }
+    origin->list_ptr = new;
 }
 
 /*
@@ -182,12 +196,43 @@ static int qchat_read(const char *path, char *buf, size_t size, off_t offset,
 	return size;
 }
 
+static int qchat_mkdir(const char *path, mode_t mode)
+{
+	int res;
+    int length = strlen(path);
+    int ptr = length - 1;
+    while(path[ptr] != '/') ptr--;
+
+    char newPath[length];
+    int tmpCount = 0;
+    while(tmpCount <= ptr){
+        newPath[tmpCount] = path[tmpCount];
+        tmpCount++;
+    }
+    newPath[tmpCount] = '\0';
+
+    struct qNode * target;
+    res = find_node(&target, root, newPath);
+    if(res != 0) return res;
+
+    struct qNode * new = malloc_node();
+    tmpCount = 0;
+    ptr++;
+    while(path[ptr] != '\0') newPath[tmpCount++] = path[ptr++];
+    newPath[tmpCount] = '\0';
+    set_node(new, strdup(newPath), NULL, 0, NULL, NULL, NULL);
+
+    add_node(target, new);
+	return 0;
+}
+
 static const struct fuse_operations qchat_oper = {
     .init       =   qchat_init,
     .getattr    =   qchat_getattr,
     .readdir    =   qchat_readdir,
     .open       =   qchat_open,
     .read       =   qchat_read,
+    .mkdir      =   qchat_mkdir,
 };
 
 static void show_help(const char *progname)
