@@ -6,7 +6,7 @@ run:
 
 clean:
 	umount QChatRoom
-	rm Qchat
+	rm QChat
 	rm -rf QChatRoom
 test:
 	mkdir QChatRoom/Alice QChatRoom/Bob QChatRoom/Cleo QChatRoom/Alice/Friends QChatRoom/Bob/Sons QChatRoom/Bob/Baby
