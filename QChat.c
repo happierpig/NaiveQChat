@@ -24,6 +24,9 @@ static struct qNode{
     struct qNode * father;
     struct qNode * next;        // for linkedlist
     struct qNode * prev;
+
+    struct qNode * userNext;    // used for user list
+    struct qNode * userPrev;
 };
 
 static struct qNode * root;
@@ -117,6 +120,34 @@ static void remove_node(struct qNode * target){
     if(target->next != NULL) target->next->prev = target->prev;
     if(target->prev != NULL) target->prev->next = target->next;
     free_node(target);
+}
+
+/*
+    Given : /Alice/Bob/t
+    Return: /Alice
+*/
+static char * getHeadPath(const char * rawPath){
+    int tmpPtr = 1;
+    while(rawPath[tmpPtr] != '/' && rawPath[tmpPtr] != '\0') tmpPtr++;
+    char * new = (char*) malloc(tmpPtr+4);
+    int newPtr = 0;
+    while(newPtr < tmpPtr){
+        new[newPtr] = rawPath[newPtr];
+        newPtr++;
+    }
+    new[newPtr] = '\0';
+    return new;
+}
+
+static char * getTailPath(const char * rawPath){
+    int size = strlen(rawPath);
+    int length = size - 1;
+    while(rawPath[length] != '/') length--;
+    char * new = (char*) malloc(size-length+1);
+    int tmpPtr = 0;
+    while(length < size) new[tmpPtr++] = rawPath[length++];
+    new[tmpPtr] = '\0';
+    return new;
 }
 
 /*
@@ -224,47 +255,69 @@ static int qchat_write(const char *path, const char *buf, size_t size,
     int res = find_node(&target, root, path); // ENOTSUP
     if(res != 0) return res;
 
+    char * sender = getHeadPath(path);
+
+    #ifdef debug
+        strcat(debugLog,"raw sender :  ");
+        strcat(debugLog,strdup(sender));
+    #endif
+
+    int senderLength = strlen(sender);
+    sender[0] = '['; sender[senderLength] = ']'; sender[senderLength+1] = '\n'; sender[senderLength+2] = '\0';
+    senderLength += 2;
+
+    #ifdef debug
+        strcat(debugLog,"\npipe sender :  ");
+        strcat(debugLog,strdup(sender));
+    #endif
+
     char * raw = target->content;
-    int finalSize = (offset + size > strlen(raw)) ? (offset + size) : strlen(raw);
+    int finalSize = (offset + size + senderLength > strlen(raw)) ? (offset + size + senderLength) : strlen(raw);
     char * newData = (char *) malloc(finalSize+1);
     memcpy(newData, raw, strlen(raw));
-    memcpy(newData + offset, buf, size);
+    memcpy(newData + offset, sender, senderLength);
+    memcpy(newData + offset + senderLength, buf, size);
     newData[finalSize] = '\0';
     free(raw);
+    free(sender);
     target->content = newData;
 
     // try to write to symmetry entry
-    int slashCount = 0;
-    int stringPtr = 0;
-    int slashPtr = 0;
-    while(path[stringPtr] != '\0'){
-        if(path[stringPtr] == '/'){
-            slashCount++;
-            if(slashCount == 2) slashPtr = stringPtr;
-        }
-        stringPtr++;
-    }
-    if(slashCount != 2) return size;
+    char * receiverPath = getTailPath(path);
+    res = find_node(&target, root, receiverPath);
     
-    char symmetryPath[stringPtr+2];
-    memcpy(symmetryPath,path+slashPtr,stringPtr-slashPtr);
-    memcpy(symmetryPath+stringPtr-slashPtr,path,slashPtr);
-    symmetryPath[stringPtr] = '\0';
-
     #ifdef debug
-        strcat(debugLog,"\n-----\n");
-        strcat(debugLog,strdup(symmetryPath));
-        strcat(debugLog,"\n");
+        strcat(debugLog,"The receiver is :  ");
+        strcat(debugLog,strdup(receiverPath));
     #endif
 
-    res = find_node(&target, root, symmetryPath);
-    if(res != 0) return size;
+    free(receiverPath);
+
+    if(res != 0 || target->specie == 1) return size;
+    char * receiverName = getHeadPath(path);
+    int nameLength = strlen(receiverName);
+    for(int i = 0;i < nameLength;++i) receiverName[i] = receiverName[i+1];
+
+    #ifdef debug
+        strcat(debugLog,"\n The sender is : ");
+        strcat(debugLog,strdup(receiverName));
+        strcat(debugLog,"\n");
+    #endif
+    
+    while(target != NULL){
+        if(strcmp(target->name,receiverName) == 0) break;
+        target = target->userNext;
+    }
+    free(receiverName);
+    if(target == NULL) return size;
+
+    assert(target->specie == 1);
     free(target->content);
     target->content = strdup(newData);
 
     #ifdef debug
         strcat(debugLog," Successfully add ");
-        strcat(debugLog, newData);
+        strcat(debugLog, strdup(buf));
         strcat(debugLog,"\n-----\n");
     #endif
 
@@ -310,7 +363,18 @@ static int qchat_mknod(const char * path, mode_t mode, dev_t di){
     res = find_node(&target, root,path);
     if(res != 0) return -EPIPE;
     target->specie = 1;
-    target->content = strdup("Hello world!\n");
+    target->content = strdup("|---Welcome to QChat!---|\n");
+    
+    struct qNode * user;
+    char * headPath = getHeadPath(path);
+    res = find_node(&user, root, headPath);
+    if(res != 0) return -EPIPE;
+    assert(user->specie == 0);
+    target->userNext = user->userNext;
+    target->userPrev = user;
+    if(user->userNext != NULL) user->userNext->userPrev = target;
+    user->userNext = target;
+    free(headPath);
     return 0;
 }
 
@@ -318,6 +382,11 @@ static int qchat_unlink(const char * path){
     struct qNode * target;
     int res = find_node(&target, root, path);
     if(res != 0) return res;
+
+    assert(target->userPrev != NULL);
+    target->userPrev->userNext = target->userNext;
+    if(target->userNext != NULL) target->userNext->userPrev = target->userPrev;
+
     remove_node(target);
     return 0;
 }
@@ -326,6 +395,7 @@ static int qchat_rmdir(const char * path){
     struct qNode * target;
     int res = find_node(&target, root, path);
     if(res != 0) return res;
+    if(target->list_ptr != NULL) return -EPIPE; // A Dirctory must delete after all subfiles is deleted. 
     remove_node(target);
     return 0;
 }
