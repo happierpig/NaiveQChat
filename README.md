@@ -47,6 +47,7 @@ I'm made of L O V E.
 Can you just not see the truth, my papa?
 ```
 
+- **NOTE**: The FRIEND relationship is bilateral, which means $A$ can communicate with $B$ if and only if $A$ is a friend of $B$ and $B$ is a friend of $A$.
 - todo:  Add permission check to stop users from looking others' chat.
 
 ### Usage
