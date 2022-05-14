@@ -48,7 +48,8 @@ Can you just not see the truth, my papa?
 ```
 
 - **NOTE**: The FRIEND relationship is bilateral, which means $A$ can communicate with $B$ if and only if $A$ is a friend of $B$ and $B$ is a friend of $A$.
-- todo:  Add permission check to stop users from looking others' chat.
+- Todo:  Add permission check to stop users from looking others' chat.
+- Todo: Add concurrent lock
 
 ### Usage
 
@@ -60,8 +61,18 @@ Can you just not see the truth, my papa?
 
 ### Reference
 
+- 关于环境配置[tutorial](https://www.jianshu.com/p/040bb60aa468)
+
 - 关于文件权限 [st_mode](https://www.runoob.com/linux/linux-file-attr-permission.html)
 
 - 关于*FUSE*操作接口的一些解释 [Click here](https://blog.csdn.net/stayneckwind2/article/details/82876330)
 
 - 关于lib红黑树的使用和内核宏`container_of` [Click here](https://blog.csdn.net/stayneckwind2/article/details/82867062).
+
+# FUSE
+
+- 虽然多了一次从内核态到用户态的切换 但仍然优化了运行效率
+
+- 因为$VFS$虽然提供了统一的接口，但通用性带来的损失是对底层实现的不可知导致的难以适应各个$FS$的特点，导致任何$FS$都要经历相同的权限Check
+
+  例如：$setxattr$调用了一大堆$vfs$的权限检查和并行检查的函数之后才最终调用底层的文件系统接口；但也许底层文件系统并不在意并行一致性问题。
